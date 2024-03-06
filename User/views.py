@@ -7,13 +7,13 @@ from .models import Profile
 # Create your views here.
 
 
-class ProfileListView(generics.ListCreateApiView):
+class ProfileListView(generics.ListCreateAPIView):
 
     queryset = Profile.objects.all()
     serializer_class = ProfileSerializer
 
 
-class ProfileDetailView(generics.RetrieveUpdateDestroyApiView):
+class ProfileDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     queryset = Profile.objects.all()
     serializer_class = ProfileSerializer
