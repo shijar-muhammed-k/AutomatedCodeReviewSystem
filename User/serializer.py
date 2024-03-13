@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from django.contrib.auth.hashers import make_password
 
-from .models import Profile
+from .models import Profile, Payment
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -18,4 +18,18 @@ class ProfileSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         password = make_password(validated_data.pop("password"))
         validated_data['password'] = password
+        return super().create(validated_data)
+    
+
+class PaymentSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Payment
+        fields = '__all__'
+
+    def create(self, validated_data):
+        amount = validated_data.get("amount")
+        profile = self.context['request'].user.profile
+        profile.credit_points += amount
+        profile.save()
         return super().create(validated_data)
