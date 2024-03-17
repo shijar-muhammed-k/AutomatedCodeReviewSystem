@@ -5,26 +5,50 @@ from rest_framework import status
 from django.http import JsonResponse, HttpResponse
 from .analysis_code import analyze_code, fix_code
 
-from .models import tempFile
+from .models import tempFile, Code
+from User.models import Profile
+from .serializer import CodeSerializer
 
 # Create your views here.
-class test(GenericAPIView):
-    
-    permission_classes = [IsAuthenticated]
+class CheckCode(GenericAPIView):
     
     def get(self, request, *args, **kwargs):
-        print(request.user)
-        return JsonResponse({'success': True})
+        user = Profile.objects.get(id=request.user.id)
+        queryset = Code.objects.all()
+        if user.role == 2:
+            queryset = Code.objects.filter(user__id = user.id)
+                    
+        serializer = CodeSerializer(queryset, many=True)
+        return Response({'success': True, 'data': serializer.data})
     
     def post(self, request, *args, **kwargs):
-        db = tempFile()
-        data = request.data
-        db.name = data['file'].name
-        db.file = data['file']
-        db.upload_at = data['upload_at']
-        db.save()
-        report = analyze_code(str(db.file))
-        return Response({'success': True, 'report': report})
+        
+        if (request.user.is_authenticated):
+            db = Code()
+            data = request.data
+            db.name = data['file'].name
+            db.code_to_review = data['file']
+            db.upload_at = data['upload_at']
+            db.user = Profile.objects.get(id = request.user.id)
+            db.save()
+            report = analyze_code(str(db.code_to_review))
+            db.code_report = report
+            db.save()
+            return Response({'success': True, 'report': report, 'id': db.id})
+            
+
+        else :
+            db = tempFile()
+            data = request.data
+            db.name = data['file'].name
+            db.file = data['file']
+            print(data['file'].size)
+            db.upload_at = data['upload_at']
+            db.save()
+            print(f'media/{str(db.file)}')
+            report = analyze_code(str(db.file))
+
+            return Response({'success': True, 'report': report})
     
 
 class CodeFix(GenericAPIView):
@@ -37,21 +61,24 @@ class CodeFix(GenericAPIView):
         profile.save()
 
     def get_object(self):
-        return tempFile.objects.get(id=self.kwargs.get('id'))
+        return Code.objects.get(id=self.kwargs.get('id'))
 
     def get(self, request, *args, **kwargs):
         instance = self.get_object()
-        file_path = str(instance.file)
+        file_path = str(instance.code_to_review)
         return Response(file_path)
 
     def post(self, request, *args, **kwargs):
         instance = self.get_object()
         print(instance)
         # report = fix_code(file)
-        reports = fix_code(str(instance.file))
+        reports = fix_code(str(instance.code_to_review))
         print(reports)
-        self.deduct_amount()
-        file_path = 'media/' + str(instance.file)
+        if(instance.restructured_code == False):
+            self.deduct_amount()
+            instance.restructured_code = True
+            instance.save()
+        file_path = 'media/' + str(instance.code_to_review)
         FilePointer = open(file_path, 'r')
         response = HttpResponse(FilePointer,content_type='application/msword')
         response['Content-Disposition'] = 'attachment; filename=NameOfFile'

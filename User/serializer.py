@@ -1,9 +1,10 @@
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from django.contrib.auth.hashers import make_password
+from django.shortcuts import get_object_or_404
 
-from .models import Profile, Payment
-
+from .models import Profile, Payment, Messages
 
 class ProfileSerializer(serializers.ModelSerializer):
 
@@ -11,8 +12,8 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Profile
-        fields = ['username', 'first_name', 'last_name', 'password', 'email', 
-                  'date_joined', 'phone', 'profile_image', 'profession', 'dob', 'gender']
+        fields = ['id', 'username', 'first_name', 'last_name', 'password', 'email', 
+                  'date_joined', 'phone', 'profile_image', 'profession', 'dob', 'gender', 'credit_points', 'role']
         
     
     def create(self, validated_data):
@@ -33,3 +34,30 @@ class PaymentSerializer(serializers.ModelSerializer):
         profile.credit_points += amount
         profile.save()
         return super().create(validated_data)
+
+
+class UserTokenObtainSerializer(TokenObtainPairSerializer):
+
+    def validate(self, attrs):
+        user = get_object_or_404(Profile, email = attrs.pop('username'))
+        print(user)
+        attrs['username'] = user.username
+        data = super().validate(attrs)
+        profile = Profile.objects.filter(username=self.user).first()
+        
+        print(data)
+        
+        return {
+            "access": data['access'],
+            "role": profile.role,
+            "id": profile.id
+        }
+        
+        
+
+class MessageSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = Messages
+        fields = '__all__'
+        depth = 1
