@@ -1,18 +1,25 @@
 from rest_framework.response import Response
 
-from rest_framework import generics
+from rest_framework import generics, filters
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializer import ProfileSerializer, PaymentSerializer, UserTokenObtainSerializer, MessageSerializer
 from .models import Profile, Payment, Messages
 from .utils import SendMail
+from rest_framework.pagination import PageNumberPagination
+
 
 class LoginView(TokenObtainPairView):
     serializer_class = UserTokenObtainSerializer
 
 class ProfileListView(generics.ListCreateAPIView):
+    
+    search_fields = ['first_name', 'last_name',]
+    filter_backends = (filters.SearchFilter,)
+    pagination_class = PageNumberPagination
+    pagination_class.page_size = 10
 
-    queryset = Profile.objects.all()
+    queryset = Profile.objects.all().order_by('created_date')
     serializer_class = ProfileSerializer
 
 

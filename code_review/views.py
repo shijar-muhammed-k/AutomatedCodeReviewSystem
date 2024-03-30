@@ -1,25 +1,42 @@
 from rest_framework.generics import (GenericAPIView)
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import status
-from django.http import JsonResponse, HttpResponse
+from django.http import HttpResponse
 from .analysis_code import analyze_code, fix_code
 
 from .models import tempFile, Code
 from User.models import Profile
 from .serializer import CodeSerializer
+from rest_framework.pagination import PageNumberPagination
+
 
 # Create your views here.
 class CheckCode(GenericAPIView):
     
-    def get(self, request, *args, **kwargs):
-        user = Profile.objects.get(id=request.user.id)
+    def get_queryset(self):
+        user = Profile.objects.get(id=self.request.user.id)
         queryset = Code.objects.all()
+        
         if user.role == 2:
-            queryset = Code.objects.filter(user__id = user.id)
-                    
-        serializer = CodeSerializer(queryset, many=True)
-        return Response({'success': True, 'data': serializer.data})
+            return queryset.filter(user=user.id).order_by('upload_at')
+
+        search_param = self.request.GET.get('search')
+        if search_param:
+            queryset = queryset.filter(user__first_name__contains=search_param)
+
+        return queryset.order_by('upload_at')
+    
+    def get(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+
+        paginator = PageNumberPagination()
+        paginator.page_size = 10
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = CodeSerializer(page, many=True)
+        return paginator.get_paginated_response({
+            'success': True,
+            'data': serializer.data,
+        })
     
     def post(self, request, *args, **kwargs):
         
