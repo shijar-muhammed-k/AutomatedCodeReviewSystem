@@ -1,13 +1,16 @@
-from rest_framework.generics import (GenericAPIView)
+import json
+import random
+from rest_framework.generics import (GenericAPIView, ListCreateAPIView)
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.http import HttpResponse
 from .analysis_code import analyze_code, fix_code
 
-from .models import tempFile, Code
+from .models import tempFile, Code, AdminCredits
 from User.models import Profile
-from .serializer import CodeSerializer
+from .serializer import CodeSerializer, AdminBalanceSerializer
 from rest_framework.pagination import PageNumberPagination
+from rest_framework import filters
 
 
 # Create your views here.
@@ -24,7 +27,7 @@ class CheckCode(GenericAPIView):
         if search_param:
             queryset = queryset.filter(user__first_name__contains=search_param)
 
-        return queryset.order_by('upload_at')
+        return queryset.order_by('-id')
     
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -49,7 +52,7 @@ class CheckCode(GenericAPIView):
             db.user = Profile.objects.get(id = request.user.id)
             db.save()
             report = analyze_code(str(db.code_to_review))
-            db.code_report = report
+            db.code_report = json.dumps(report)
             db.save()
             return Response({'success': True, 'report': report, 'id': db.id})
             
@@ -59,10 +62,8 @@ class CheckCode(GenericAPIView):
             data = request.data
             db.name = data['file'].name
             db.file = data['file']
-            print(data['file'].size)
             db.upload_at = data['upload_at']
             db.save()
-            print(f'media/{str(db.file)}')
             report = analyze_code(str(db.file))
 
             return Response({'success': True, 'report': report})
@@ -76,6 +77,10 @@ class CodeFix(GenericAPIView):
         profile = self.request.user.profile
         profile.credit_points -= 10
         profile.save()
+        adminInstance = AdminCredits()
+        adminInstance.profile = profile
+        adminInstance.transaction = ''.join(str(random.randint(0, 9)) for _ in range(14))
+        adminInstance.save()
 
     def get_object(self):
         return Code.objects.get(id=self.kwargs.get('id'))
@@ -88,32 +93,26 @@ class CodeFix(GenericAPIView):
     def post(self, request, *args, **kwargs):
         instance = self.get_object()
         print(instance)
-        # report = fix_code(file)
-        reports = fix_code(str(instance.code_to_review))
-        print(reports)
+        fix_code(str(instance.code_to_review))
+        
         if(instance.restructured_code == False):
             self.deduct_amount()
             instance.restructured_code = True
             instance.save()
+            
         file_path = 'media/' + str(instance.code_to_review)
         FilePointer = open(file_path, 'r')
         response = HttpResponse(FilePointer,content_type='application/msword')
         response['Content-Disposition'] = 'attachment; filename=NameOfFile'
         return response
+
     
-    """
-    front-end code for this to work (in react)
-handleDownload(id, filename) {
-fetch(`http://127.0.0.1:8000/example/download/${id}/`).then(
-    response => {
-    response.blob().then(blob => {
-    let url = window.URL.createObjectURL(blob);
-    let a = document.createElement("a");
-    console.log(url);
-    a.href = url;
-    a.download = filename;
-    a.click();
-    });
-});
-}
-"""
+class AdminBalanceListView(ListCreateAPIView):
+    search_fields = ['profile__first_name', 'profile__last_name',]
+    filter_backends = (filters.SearchFilter,)
+    
+    pagination_class = PageNumberPagination
+    pagination_class.page_size = 10
+    
+    queryset = AdminCredits.objects.all()
+    serializer_class = AdminBalanceSerializer
