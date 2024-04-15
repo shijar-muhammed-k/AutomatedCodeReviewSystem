@@ -1,7 +1,8 @@
 from django.urls import path
-from .views import test, CodeFix
+from .views import CheckCode, CodeFix, AdminBalanceListView
 
 urlpatterns = [
-    path('code/', test.as_view(), name='CodeReview'),
+    path('code/', CheckCode.as_view(), name='CodeReview'),
     path('fix/<id>', CodeFix.as_view(), name='code-fix'),
+    path('balance', AdminBalanceListView.as_view(), name='balance'),
 ]

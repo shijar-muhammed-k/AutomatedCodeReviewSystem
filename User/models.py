@@ -11,6 +11,8 @@ class Profile(User):
         (FEMALE, 'female'),
         (OTHERS, 'others'),
     )
+    
+    Role = ((1 ,'admin'), (2, 'user'))
 
     phone = models.CharField(max_length=15, null=True, blank=True)
     profile_image = models.ImageField(upload_to='profile_image/', null=True, blank=True)
@@ -19,6 +21,7 @@ class Profile(User):
     credit_points = models.PositiveIntegerField(default=0)
     gender = models.IntegerField(choices=GENDER_CHOICES, null=True, blank=True)
     created_date = models.DateTimeField(auto_now_add=True)
+    role = models.IntegerField(choices=Role, default=2)
 
     def __str__(self) :
         return self.first_name + " " + self.last_name
@@ -30,3 +33,10 @@ class Payment(models.Model):
     amount = models.PositiveIntegerField()
     transcation_id = models.CharField(max_length=52, null=True, blank=True)
     created_date = models.DateTimeField(auto_now_add=True)
+    
+    
+class Messages(models.Model):
+    user = models.ForeignKey(Profile, on_delete=models.CASCADE)
+    message = models.TextField()
+    upload_at = models.DateTimeField(auto_now_add=True)
+    replied = models.BooleanField(default=False)
